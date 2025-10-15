@@ -16,7 +16,7 @@ yelp_100 elapsed time: 1h53m1.355649996s
 yelp_150 elapsed time: 2h49m6.066836819s
 yelp_200 elapsed time: 3h47m29.384235741s
 
-rms_50 one seqlen 50.89s
-dbpedia_s_30 elapsed time: 26m23.895108426s
-dbpedia_s_50 elapsed time: 43m48.83928942s
-dbpedia_s_70 elapsed time: 59m38.140375923s
+rms_64 one seqlen 52.8s
+dbpedia_s_30 elapsed time: 27m21.850266315s
+dbpedia_s_50 elapsed time: 45m29.070322373s
+dbpedia_s_70 elapsed time: 1h1m9.265506661s
