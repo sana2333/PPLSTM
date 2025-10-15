@@ -209,7 +209,7 @@ func lstm(dataName string, batchID int) {
 	}
 	finalRes := make([]float64, slots)
 	ckksTool.End.Decode(ckksTool.Dec.DecryptNew(finalH), finalRes)
-	utils.SaveDataToFile(finalRes, fmt.Sprintf("result/%s_rms_h_%d.txt", dataName, batchID))
+	// utils.SaveDataToFile(finalRes, fmt.Sprintf("result/%s_rms_h_%d.txt", dataName, batchID))
 
 	w_fc, b_fc := params.FCWeight, utils.Repeat(batchSize, params.FCBias)
 	logits := ckksTool.MatrixMultiplyWithWorkers(batchSize, finalH, w_fc, 4)
