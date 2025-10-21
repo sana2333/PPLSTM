@@ -344,3 +344,40 @@ func Repeat(m int, x []float64) []float64 {
 	}
 	return res
 }
+
+func Transpose(matrix [][]float64) [][]float64 {
+
+	rows := len(matrix)
+	cols := len(matrix[0])
+
+	rowsT := cols
+	colsT := rows
+
+	result := make([][]float64, rowsT)
+	for i := range result {
+		result[i] = make([]float64, colsT)
+	}
+
+	for i := 0; i < rows; i++ {
+		for j := 0; j < cols; j++ {
+			result[j][i] = matrix[i][j]
+		}
+	}
+
+	return result
+}
+
+func PadMatrix(input [][]float64, targetR, targetC int) [][]float64 {
+	R := len(input)
+
+	result := make([][]float64, targetR)
+	for i := 0; i < targetR; i++ {
+		result[i] = make([]float64, targetC)
+	}
+
+	for i := 0; i < R; i++ {
+		copy(result[i], input[i])
+	}
+
+	return result
+}

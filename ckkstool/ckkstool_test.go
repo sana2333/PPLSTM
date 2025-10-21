@@ -10,6 +10,75 @@ import (
 	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
 )
 
+// go test -v -run ^TestPCMMDiagonal$ -timeout=20m lstm/ckkstool
+func TestPCMMDiagonal(t *testing.T) {
+
+	m, n, p := 512, 64, 40
+	x := make([][]float64, m)
+	w := make([][]float64, n)
+
+	for i := 0; i < m; i++ {
+		x[i] = make([]float64, p)
+		for j := 0; j < p; j++ {
+			x[i][j] = rand.Float64()
+		}
+	}
+	for i := 0; i < n; i++ {
+		w[i] = make([]float64, p)
+		for j := 0; j < p; j++ {
+			w[i][j] = rand.Float64()
+		}
+	}
+	wt := utils.Transpose(w)
+	fmt.Println("数据生成成功")
+
+	ckksTool, err := NewCKKSTool()
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println("初始化成功")
+	}
+
+	ptx := ckks.NewPlaintext(ckksTool.Params, ckksTool.Params.MaxLevel())
+	ckksTool.End.Encode(utils.ColCoding(x), ptx)
+	ctx, _ := ckksTool.Enc.EncryptNew(ptx)
+	fmt.Println(ctx.Level(), " ", ctx.Scale)
+
+	ptx1 := ckks.NewPlaintext(ckksTool.Params, ckksTool.Params.MaxLevel())
+	ckksTool.End.Encode(utils.ColCoding(utils.PadMatrix(x, m, n)), ptx1)
+	ctx1, _ := ckksTool.Enc.EncryptNew(ptx1)
+
+	start := time.Now()
+	res := ckksTool.MatrixMultiplyPCMMDiagonal(m, ctx1, utils.PadMatrix(wt, n, n), 2)
+	elapsed := time.Since(start)
+	fmt.Println("矩阵乘法1时间:", elapsed)
+
+	ckksTool.DecToFloat64(res)
+	ckksTool.Eval.RescaleTo(res, ctx.Scale, res)
+	fmt.Println(res.Level(), " ", res.Scale)
+
+	start = time.Now()
+	res = ckksTool.MatrixMultiplyWithWorkers(m, ctx, w, 1)
+	elapsed = time.Since(start)
+	fmt.Println("矩阵乘法2时间:", elapsed)
+
+	ckksTool.DecToFloat64(res)
+	ckksTool.Eval.RescaleTo(res, ctx.Scale, res)
+	fmt.Println(res.Level(), " ", res.Scale)
+
+	y := make([]float64, 10)
+	for i := 0; i < 5; i++ {
+		y[i*2] = 0
+		for j := 0; j < p; j++ {
+			y[i*2] += x[i][j] * w[0][j]
+		}
+		for j := 0; j < p; j++ {
+			y[i*2+1] += x[m-5+i][j] * w[n-1][j]
+		}
+	}
+	fmt.Println(y)
+}
+
 // go test -v -run ^TestMatrixMultiply1$ -timeout=20m lstm/ckkstool
 func TestMatrixMultiply(t *testing.T) {
 	m := 256

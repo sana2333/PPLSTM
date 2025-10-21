@@ -3,6 +3,7 @@ package ckkstool
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"runtime"
 	"strconv"
@@ -32,7 +33,7 @@ func NewCKKSTool() (*CKKSTool, error) {
 	// Lattigo v6 参数设置
 	params, err := ckks.NewParametersFromLiteral(ckks.ParametersLiteral{
 		LogN:            15,
-		LogQ:            []int{55, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40},
+		LogQ:            []int{55, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40},
 		LogP:            []int{61, 61, 61},
 		LogDefaultScale: 40,
 		RingType:        ring.ConjugateInvariant,
@@ -59,11 +60,17 @@ func NewCKKSTool() (*CKKSTool, error) {
 	galEls := make([]uint64, 0)
 	for i := 256; i < 256*128; i = i * 2 {
 		galEls = append(galEls, params.GaloisElement(i))
-		galEls = append(galEls, params.GaloisElement(-i))
 	}
 	for i := 1; i < 128; i++ {
-		galEls = append(galEls, params.GaloisElement(-i*256))
+		galEls = append(galEls, params.GaloisElement(i*256))
 	}
+
+	// for i := 512; i < 512*64; i = i * 2 {
+	// 	galEls = append(galEls, params.GaloisElement(i))
+	// }
+	// for i := 1; i < 64; i++ {
+	// 	galEls = append(galEls, params.GaloisElement(i*512))
+	// }
 
 	evk := rlwe.NewMemEvaluationKeySet(kgen.GenRelinearizationKeyNew(sk), kgen.GenGaloisKeysNew(galEls, sk)...)
 	end := ckks.NewEncoder(params)
@@ -163,6 +170,80 @@ func (ckksTool *CKKSTool) MatrixMultiplyWithWorkers(m int, ctx *rlwe.Ciphertext,
 	ctg := ctgs[0].CopyNew()
 	for i := 1; i < n; i++ {
 		ckksTool.Eval.Add(ctg, ctgs[i], ctg)
+	}
+
+	return ctg
+}
+
+// 对角线编码,x[m, n], w[n, n]
+func (ckksTool *CKKSTool) MatrixMultiplyPCMMDiagonal(m int, ctx *rlwe.Ciphertext, w [][]float64, numWorkers int) *rlwe.Ciphertext {
+
+	n := len(w)
+	slots := ckksTool.Params.MaxSlots()
+
+	// 明文矩阵 W 的对角线编码
+	WDiagonals := make([]*rlwe.Plaintext, n)
+	for k := 0; k < n; k++ {
+		diagVector := make([]float64, slots)
+
+		for rowX := 0; rowX < m; rowX++ {
+			for j := 0; j < n; j++ {
+				rowW := (j + k) % n // W 的行索引 rowW = (j + k) mod n
+				slotIdx := (j * m) + rowX
+				diagVector[slotIdx] = w[rowW][j]
+			}
+		}
+
+		pt := ckks.NewPlaintext(ckksTool.Params, ctx.Level())
+		ckksTool.End.Encode(diagVector, pt)
+		WDiagonals[k] = pt
+	}
+
+	if numWorkers <= 0 {
+		numWorkers = runtime.NumCPU()
+	}
+	if numWorkers > n {
+		numWorkers = n
+	}
+
+	ctgs := make([]*rlwe.Ciphertext, n)
+	jobs := make(chan int, n)
+	var wg sync.WaitGroup
+
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			localEval := ckks.NewEvaluator(ckksTool.Params, ckksTool.Evk)
+
+			for k := range jobs {
+				var cXRotated *rlwe.Ciphertext
+				if k == 0 {
+					cXRotated = ctx.CopyNew()
+				} else {
+					cXRotated, _ = localEval.RotateNew(ctx, k*m)
+				}
+
+				ctgs[k], _ = localEval.MulNew(cXRotated, WDiagonals[k])
+				localEval.Rescale(ctgs[k], ctgs[k])
+			}
+		}()
+	}
+
+	for k := 0; k < n; k++ {
+		jobs <- k
+	}
+	close(jobs)
+	wg.Wait()
+
+	ctg := ctgs[0].CopyNew()
+
+	for i := 1; i < n; i++ {
+		err := ckksTool.Eval.Add(ctg, ctgs[i], ctg)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	return ctg
@@ -284,7 +365,7 @@ func (ckksTool *CKKSTool) DecToFloat64(ctx *rlwe.Ciphertext) {
 	ckksTool.End.Decode(ptx, res)
 	for i := 0; i < 5; i++ {
 		fmt.Print(res[i], " ")
-		fmt.Print(res[25599+i], " ")
+		fmt.Print(res[32763+i], " ")
 	}
 	fmt.Println()
 }
