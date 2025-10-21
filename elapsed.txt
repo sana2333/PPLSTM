@@ -1,22 +1,36 @@
-16 thread
-rms one seqlen 67.73s
-agnews_30 elapsed time: 34m13.242853613s
-agnews_50 elapsed time: 56m49.106493728s
-agnews_70 elapsed time: 1h20m15.249060753s
+8 thread
+rms_128_15 one seqlen 62.85     MaxAllocated Memory: 59533.38 MB
 
-dbpedia_30 elapsed time: 34m5.247918314s
-dbpedia_50 elapsed time: 56m37.51689249s
-dbpedia_70 elapsed time: 1h19m26.71075492s
+rms_128 one seqlen 53.41s    MaxAllocated Memory: 42398.03 MB
+agnews_30 elapsed time: 27m13.570510749s
+agnews_50 elapsed time: 45m35.220596649s
+agnews_70 elapsed time: 1h3m56.419256641s
 
-imdb_100 elapsed time: 1h52m41.18431764s
-imdb_150 elapsed time: 2h49m23.746008539s
-imdb_200 elapsed time: 3h47m3.377427571s
+dbpedia_30 elapsed time: 27m5.247918314s
+dbpedia_50 elapsed time: 45m37.51689249s
+dbpedia_70 elapsed time: 1h2m26.71075492s
 
-yelp_100 elapsed time: 1h53m1.355649996s
-yelp_150 elapsed time: 2h49m6.066836819s
-yelp_200 elapsed time: 3h47m29.384235741s
+imdb_100 elapsed time: 1h30m41.18431764s
+imdb_150 elapsed time: 2h15m23.746008539s
+imdb_200 elapsed time: 2h58m3.377427571s
 
-rms_64 one seqlen 52.8s
-dbpedia_s_30 elapsed time: 27m21.850266315s
-dbpedia_s_50 elapsed time: 45m29.070322373s
-dbpedia_s_70 elapsed time: 1h1m9.265506661s
+yelp_100 elapsed time: 1h30m22.501429693s
+yelp_150 elapsed time: 2h14m42.571378507s
+yelp_200 elapsed time: 2h59m29.904108229s
+
+rms_64_s one seqlen 45.74s
+agnews_30 elapsed time: 23m33.008933237s
+agnews_50 elapsed time: 39m6.972354431s
+agnews_70 elapsed time: 53m32.120342702s
+
+dbpedia_30 elapsed time: 23m21.850266315s
+dbpedia_50 elapsed time: 40m29.070322373s
+dbpedia_70 elapsed time: 53m9.265506661s
+
+imdb_100 elapsed time: 1h16m42.883734083s
+imdb_150 elapsed time: 1h55m40.999402143s
+imdb_200 elapsed time: 2h33m17.695517816s
+
+yelp_100 elapsed time: 1h17m30.432091219s
+yelp_150 elapsed time: 1h55m2.902070037s
+yelp_200 elapsed time: 2h34m1.040822317s
