@@ -264,7 +264,7 @@ func lstm(dataName string, batchID int) {
 
 	logRes := make([]float64, slots)
 	ckksTool.End.Decode(ckksTool.Dec.DecryptNew(logits), logRes)
-	utils.SaveDataToFile(logRes, fmt.Sprintf("result/%s_rms_s_%d.txt", dataName, batchID))
+	utils.SaveDataToFile(logRes, fmt.Sprintf("result/%s_rms_%d.txt", dataName, batchID))
 
 	elapsed = time.Since(startTime)
 	fmt.Println("all running time: ", elapsed)
