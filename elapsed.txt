@@ -8,7 +8,7 @@ agnews_70 elapsed time: 1h3m56.419256641s
 
 dbpedia_30 elapsed time: 27m5.247918314s
 dbpedia_50 elapsed time: 45m37.51689249s
-dbpedia_70 elapsed time: 1h2m26.71075492s
+dbpedia_70 elapsed time: 1h1m26.71075492s
 
 imdb_100 elapsed time: 1h30m41.18431764s
 imdb_150 elapsed time: 2h15m23.746008539s
