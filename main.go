@@ -85,7 +85,6 @@ func lstm(dataName string, batchID int) {
 	b_hh_3 := make([][]float64, layers)
 
 	w_rn := make([][]float64, layers)
-
 	for i := 0; i < layers; i++ {
 		w_ih := params.LSTM[i].W_ih
 		b_ih := params.LSTM[i].B_ih
@@ -188,6 +187,12 @@ func lstm(dataName string, batchID int) {
 
 			ckksTool.Eval.Rescale(ctc[i], ctc[i])
 
+			var bootstrapErr error
+			if ctc[i], bootstrapErr = ckksTool.BootEval.Bootstrap(ctc[i]); bootstrapErr != nil {
+				fmt.Printf("error seqlen %d first Bootstrapping faile: %v\n", t, bootstrapErr)
+				return
+			}
+
 			ckksTool.Eval.Mul(ctc[i], ckksTool.ArrayToPt(w_rn[i], ctc[i].Level()), ctc[i])
 			ckksTool.Eval.Rescale(ctc[i], ctc[i])
 
@@ -199,32 +204,10 @@ func lstm(dataName string, batchID int) {
 			}
 			ckksTool.Eval.Rescale(cth[i], cth[i])
 
-			var bootstrapErr error
-			if ctc[i], bootstrapErr = ckksTool.BootEval.Bootstrap(ctc[i]); bootstrapErr != nil {
-				fmt.Printf("error seqlen %d first Bootstrapping faile: %v\n", t, bootstrapErr)
-				return
-			}
-
 			if cth[i], bootstrapErr = ckksTool.BootEval.Bootstrap(cth[i]); bootstrapErr != nil {
 				fmt.Printf("error seqlen %d second Bootstrapping faile: %v\n", t, bootstrapErr)
 				return
 			}
-
-			// var wg sync.WaitGroup
-			// wg.Add(1)
-			// go func() {
-			// 	defer wg.Done()
-			// 	ctc[i], _ = ckksTool.BootEval.Bootstrap(ctc[i])
-			// }()
-
-			// wg.Add(1)
-			// go func() {
-			// 	defer wg.Done()
-			// 	cth[i], _ = ckksTool.BootEval.Bootstrap(cth[i])
-			// }()
-			// wg.Wait()
-
-			// ckksTool.LogCiphertextInfo(cth[i], "cth", t)
 		}
 
 		if t >= minLen-1 {
@@ -242,12 +225,13 @@ func lstm(dataName string, batchID int) {
 		fmt.Printf("seqlen %d running time: %v\n", t, elapsed)
 
 		var m runtime.MemStats
-		runtime.ReadMemStats(&m)
-		currentAlloc := m.Alloc
+		runtime.ReadMemStats(&m) // 读取当前的内存统计
+		currentAlloc := m.Alloc  // m.Alloc 是当前分配的堆对象字节数
 		currentSys := m.Sys
 		fmt.Printf("seqlen %d: Current Allocated Memory (Heap): %.2f MB\n", t, float64(currentAlloc)/MB)
 		fmt.Printf("seqlen %d: Current System Memory (Heap): %.2f MB\n", t, float64(currentSys)/MB)
 
+		// 更新最大内存
 		if currentAlloc > maxAlloc {
 			maxAlloc = currentAlloc
 		}
@@ -264,7 +248,7 @@ func lstm(dataName string, batchID int) {
 
 	logRes := make([]float64, slots)
 	ckksTool.End.Decode(ckksTool.Dec.DecryptNew(logits), logRes)
-	utils.SaveDataToFile(logRes, fmt.Sprintf("result/%s_rms_%d.txt", dataName, batchID))
+	utils.SaveDataToFile(logRes, fmt.Sprintf("result/%s_rms_s_%d.txt", dataName, batchID))
 
 	elapsed = time.Since(startTime)
 	fmt.Println("all running time: ", elapsed)
