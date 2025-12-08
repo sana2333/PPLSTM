@@ -225,13 +225,12 @@ func lstm(dataName string, batchID int) {
 		fmt.Printf("seqlen %d running time: %v\n", t, elapsed)
 
 		var m runtime.MemStats
-		runtime.ReadMemStats(&m) // 读取当前的内存统计
-		currentAlloc := m.Alloc  // m.Alloc 是当前分配的堆对象字节数
+		runtime.ReadMemStats(&m)
+		currentAlloc := m.Alloc
 		currentSys := m.Sys
 		fmt.Printf("seqlen %d: Current Allocated Memory (Heap): %.2f MB\n", t, float64(currentAlloc)/MB)
 		fmt.Printf("seqlen %d: Current System Memory (Heap): %.2f MB\n", t, float64(currentSys)/MB)
 
-		// 更新最大内存
 		if currentAlloc > maxAlloc {
 			maxAlloc = currentAlloc
 		}
