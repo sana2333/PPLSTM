@@ -160,10 +160,10 @@ go run main.go
 After each run, check:
 
 1. Logits output file:
-- `result/<dataset>_rms_s_<batchID>.txt`
+- `result/<dataset>_rms_s_<input tokens>.txt`
 2. Runtime log:
-- `elapsed.txt` (appended each run, format: `<dataset>_<batchID> elapsed time: ...`)
+- `elapsed.txt` (appended each run, format: `<dataset>_<input tokens> elapsed time: ...`)
 3. Independent verification checklist:
-- confirm the selected `dataset`, `batchID`, and `hidden_dim` match
+- confirm the selected `dataset`, `input tokens`, `hidden_dim`, and `threads` match
 - confirm parameter files were loaded from the expected `params` path(s)
 - confirm output file exists and has non-empty float values
