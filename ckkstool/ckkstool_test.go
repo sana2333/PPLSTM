@@ -13,7 +13,7 @@ import (
 // go test -v -run ^TestPCMMDiagonal$ -timeout=20m lstm/ckkstool
 func TestPCMMDiagonal(t *testing.T) {
 
-	m, n, p := 512, 64, 40
+	m, n, p := 512, 64, 64
 	x := make([][]float64, m)
 	w := make([][]float64, n)
 
@@ -58,7 +58,7 @@ func TestPCMMDiagonal(t *testing.T) {
 	fmt.Println(res.Level(), " ", res.Scale)
 
 	start = time.Now()
-	res = ckksTool.MatrixMultiplyWithWorkers(m, ctx, w, 1)
+	res = ckksTool.MatrixMultiplyPCMMDiagonalBSGS(m, ctx1, utils.PadMatrix(wt, n, n), 2)
 	elapsed = time.Since(start)
 	fmt.Println("矩阵乘法2时间:", elapsed)
 

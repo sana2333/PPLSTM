@@ -56,15 +56,8 @@ Supported `TokensID` values (from `data/` files):
 
 ## 4. Important Path Consistency Note
 
-Current code reads parameter files from two paths:
+To avoid file-not-found errors, Recommended: keep `params/` in project root and make paths consistent in code (`utils/utils.go`, `GetParams`, set `paramDir := "./params"`).
 
-- `./params` (embedding in `GetEmbeddings`)
-- `../params` (LSTM/RMSNorm/FC in `GetParams`)
-
-To avoid file-not-found errors, choose one method:
-
-1. Recommended: keep `params/` in project root and make paths consistent in code (`utils/utils.go`, `GetParams`, set `paramDir := "./params"`).
-2. No-code-change workaround: keep `params/` in project root, and also create `../params` as a symlink (or copy) pointing to the same folder.
 
 ## 5. Configure Experiment Parameters
 

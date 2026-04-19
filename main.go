@@ -16,7 +16,7 @@ import (
 
 const MB = 1024 * 1024
 
-func lstm(dataName string, batchID int) {
+func lstm(dataName string, batchID int, hidden_dim int, thread int) {
 	var start time.Time
 	var elapsed time.Duration
 
@@ -42,13 +42,11 @@ func lstm(dataName string, batchID int) {
 	minLen := slices.Min(seqLens)
 	maxLen := slices.Max(seqLens)
 	fmt.Println(maxLen)
-	hidden_dim := 128
 
 	layers := 1
 	params := utils.GetParams(dataName, layers)
 
 	coeff := coeffs.DatasetCoeffs[dataName]
-	thread := 8
 
 	z := make([]float64, slots)
 	ptz := ckks.NewPlaintext(ckksTool.Params, ckksTool.Params.MaxLevel())
@@ -265,25 +263,5 @@ func lstm(dataName string, batchID int) {
 }
 
 func main() {
-	// var wg sync.WaitGroup
-
-	// tasks := []struct {
-	// 	dataset string
-	// 	epochs  int
-	// }{
-	// 	{"imdb_s", 100},
-	// 	{"imdb_s", 150},
-	// 	{"imdb_s", 200},
-	// }
-
-	// for _, task := range tasks {
-	// 	wg.Add(1)
-	// 	go func(dataset string, epochs int) {
-	// 		defer wg.Done()
-	// 		lstm(dataset, epochs)
-	// 	}(task.dataset, task.epochs)
-	// }
-	// wg.Wait()
-
-	lstm("yelp", 150)
+	lstm("yelp", 150, 128, 8)
 }

@@ -223,7 +223,7 @@ type ModelParams struct {
 }
 
 func GetParams(fileDir string, layers int) *ModelParams {
-	paramDir := "../params"
+	paramDir := "./params"
 
 	params := &ModelParams{
 		LSTM: make(map[int]LSTMParams),
