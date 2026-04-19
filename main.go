@@ -136,27 +136,27 @@ func lstm(dataName string, batchID int, hidden_dim int, thread int) {
 		}()
 
 		for i := 0; i < layers; i++ {
-			cti_ih := ckksTool.MatrixMultiplyPCMMDiagonal(batchSize, ctx, w_ih_0[i], thread)
+			cti_ih := ckksTool.MatrixMultiplyPCMMDiagonalBSGS(batchSize, ctx, w_ih_0[i], thread)
 			ckksTool.Eval.Add(cti_ih, ckksTool.ArrayToPt(b_ih_0[i], cti_ih.Level()), cti_ih)
-			cti_hh := ckksTool.MatrixMultiplyPCMMDiagonal(batchSize, cth[i], w_hh_0[i], thread)
+			cti_hh := ckksTool.MatrixMultiplyPCMMDiagonalBSGS(batchSize, cth[i], w_hh_0[i], thread)
 			ckksTool.Eval.Add(cti_hh, ckksTool.ArrayToPt(b_hh_0[i], cti_hh.Level()), cti_hh)
 			cti, _ := ckksTool.Eval.AddNew(cti_ih, cti_hh)
 
-			ctf_ih := ckksTool.MatrixMultiplyPCMMDiagonal(batchSize, ctx, w_ih_1[i], thread)
+			ctf_ih := ckksTool.MatrixMultiplyPCMMDiagonalBSGS(batchSize, ctx, w_ih_1[i], thread)
 			ckksTool.Eval.Add(ctf_ih, ckksTool.ArrayToPt(b_ih_1[i], ctf_ih.Level()), ctf_ih)
-			ctf_hh := ckksTool.MatrixMultiplyPCMMDiagonal(batchSize, cth[i], w_hh_1[i], thread)
+			ctf_hh := ckksTool.MatrixMultiplyPCMMDiagonalBSGS(batchSize, cth[i], w_hh_1[i], thread)
 			ckksTool.Eval.Add(ctf_hh, ckksTool.ArrayToPt(b_hh_1[i], ctf_hh.Level()), ctf_hh)
 			ctf, _ := ckksTool.Eval.AddNew(ctf_ih, ctf_hh)
 
-			ctg_ih := ckksTool.MatrixMultiplyPCMMDiagonal(batchSize, ctx, w_ih_2[i], thread)
+			ctg_ih := ckksTool.MatrixMultiplyPCMMDiagonalBSGS(batchSize, ctx, w_ih_2[i], thread)
 			ckksTool.Eval.Add(ctg_ih, ckksTool.ArrayToPt(b_ih_2[i], ctg_ih.Level()), ctg_ih)
-			ctg_hh := ckksTool.MatrixMultiplyPCMMDiagonal(batchSize, cth[i], w_hh_2[i], thread)
+			ctg_hh := ckksTool.MatrixMultiplyPCMMDiagonalBSGS(batchSize, cth[i], w_hh_2[i], thread)
 			ckksTool.Eval.Add(ctg_hh, ckksTool.ArrayToPt(b_hh_2[i], ctg_hh.Level()), ctg_hh)
 			ctg, _ := ckksTool.Eval.AddNew(ctg_ih, ctg_hh)
 
-			cto_ih := ckksTool.MatrixMultiplyPCMMDiagonal(batchSize, ctx, w_ih_3[i], thread)
+			cto_ih := ckksTool.MatrixMultiplyPCMMDiagonalBSGS(batchSize, ctx, w_ih_3[i], thread)
 			ckksTool.Eval.Add(cto_ih, ckksTool.ArrayToPt(b_ih_3[i], cto_ih.Level()), cto_ih)
-			cto_hh := ckksTool.MatrixMultiplyPCMMDiagonal(batchSize, cth[i], w_hh_3[i], thread)
+			cto_hh := ckksTool.MatrixMultiplyPCMMDiagonalBSGS(batchSize, cth[i], w_hh_3[i], thread)
 			ckksTool.Eval.Add(cto_hh, ckksTool.ArrayToPt(b_hh_3[i], cto_hh.Level()), cto_hh)
 			cto, _ := ckksTool.Eval.AddNew(cto_ih, cto_hh)
 
