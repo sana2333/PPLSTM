@@ -131,7 +131,7 @@ Edit [`main.go`](/D:/Code/golang/PPLSTM/main.go):
    All polynomial coefficients are stored **from the lowest degree term to the highest degree term**. For example, the `Rsqrt` coefficients represent the polynomial:
    
    $$
-   Rsqrt(x)=2.58685626 + (-3.77715572)*x + 2.79941214*x^2 + (-0.70589577)*x^3
+   Rsqrt(x)=2.58685626 + (-3.77715572) \cdot x + 2.79941214 \cdot x^2 + (-0.70589577) \cdot x^3
    $$
    
    This ordering is consistently used throughout `coeff.go` for all activation approximations.
