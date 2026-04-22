@@ -196,7 +196,6 @@ func lstm(dataName string, batchID int, hidden_dim int, thread int) {
 
 			tc := ckksTool.OptimizedFit(ctc[i], coeff.TanhC, coeff.TanhCRange)
 
-			ckksTool.Eval.DropLevel(tc, tc.Level()-O.Level())
 			if cth[i], err = ckksTool.Eval.MulRelinNew(O, tc); err != nil {
 				fmt.Println(err)
 			}
