@@ -165,7 +165,6 @@ func lstm(dataName string, batchID int, hidden_dim int, thread int) {
 			G := ckksTool.OptimizedFit(ctg, coeff.TanhG, coeff.TanhGRange)
 			O := ckksTool.OptimizedFit(cto, coeff.Sigmoid, coeff.SigmoidRange)
 
-			ckksTool.Eval.DropLevel(ctc[i], ctc[i].Level()-F.Level())
 			ckksTool.Eval.MulRelin(ctc[i], F, ctc[i])
 			ckksTool.Eval.Rescale(ctc[i], ctc[i])
 
@@ -180,7 +179,6 @@ func lstm(dataName string, batchID int, hidden_dim int, thread int) {
 			ckksTool.Eval.Add(ms, 1e-5, ms)
 
 			rv := ckksTool.OptimizedFit(ms, coeff.Rsqrt, coeff.RsqrtRange)
-			ckksTool.Eval.DropLevel(ctc[i], ctc[i].Level()-rv.Level())
 			ckksTool.Eval.MulRelin(ctc[i], rv, ctc[i])
 
 			ckksTool.Eval.Rescale(ctc[i], ctc[i])
