@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,18 +31,59 @@ type CKKSTool struct {
 	BootEval *bootstrapping.Evaluator
 }
 
-func NewCKKSTool() (*CKKSTool, error) {
+// func NewCKKSTool() (*CKKSTool, error) {
+// 	return NewCKKSToolForConfig(512, 64)
+// }
+
+func RequiredRotationSteps(batchSize, hiddenDim int) []int {
+	if batchSize <= 0 || hiddenDim <= 0 {
+		return nil
+	}
+
+	steps := map[int]bool{}
+	add := func(step int) {
+		if step != 0 {
+			steps[step] = true
+		}
+	}
+
+	n2 := int(math.Ceil(math.Sqrt(float64(hiddenDim))))
+	n1 := int(math.Ceil(float64(hiddenDim) / float64(n2)))
+	for j := 1; j < n2; j++ {
+		add(j * batchSize)
+	}
+	for i := 1; i < n1; i++ {
+		add(i * n2 * batchSize)
+	}
+
+	for step := batchSize * (hiddenDim / 2); step >= batchSize && step > 0; step /= 2 {
+		add(step)
+	}
+	for step := batchSize; step <= batchSize*(hiddenDim/2) && step > 0; step *= 2 {
+		add(-step)
+	}
+
+	res := make([]int, 0, len(steps))
+	for step := range steps {
+		res = append(res, step)
+	}
+	sort.Ints(res)
+	return res
+}
+
+func NewCKKSToolForConfig(batchSize, hiddenDim int) (*CKKSTool, error) {
 	// Lattigo v6 参数设置
 	params, err := ckks.NewParametersFromLiteral(ckks.ParametersLiteral{
-		LogN:            15,
-		LogQ:            []int{55, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40},
+		LogN: 15,
+		LogQ: []int{55, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40},
+		// LogQ:            []int{55, 40},
 		LogP:            []int{61, 61, 61},
 		LogDefaultScale: 40,
 		RingType:        ring.ConjugateInvariant,
 		Xs:              ring.Ternary{H: 192},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("param creat error: %v", err)
+		return nil, fmt.Errorf("param create error: %v", err)
 	}
 
 	bootParams, err := bootstrapping.NewParametersFromLiteral(params, bootstrapping.ParametersLiteral{
@@ -51,7 +93,7 @@ func NewCKKSTool() (*CKKSTool, error) {
 		LogSlots: utils.Pointy(15),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("bootstraping param creat error: %v", err)
+		return nil, fmt.Errorf("bootstraping param create error: %v", err)
 	}
 
 	kgen := rlwe.NewKeyGenerator(params)
@@ -59,32 +101,23 @@ func NewCKKSTool() (*CKKSTool, error) {
 	pk := kgen.GenPublicKeyNew(sk)
 
 	galEls := make([]uint64, 0)
-	for i := 256; i < 256*128; i = i * 2 {
-		galEls = append(galEls, params.GaloisElement(i))
-	}
-	for i := 1; i < 128; i++ {
-		galEls = append(galEls, params.GaloisElement(i*256))
+	// for i := 1; i < 128; i++ {
+	// 	galEls = append(galEls, params.GaloisElement(i*256))
+	// }
+
+	// for i := 1; i < 64; i++ {
+	// 	galEls = append(galEls, params.GaloisElement(i*512))
+	// }
+
+	steps := RequiredRotationSteps(batchSize, hiddenDim)
+
+	galElsSet := make(map[uint64]bool)
+	for _, step := range steps {
+		galElsSet[params.GaloisElement(step)] = true
 	}
 
-	for i := 1; i < 12; i++ {
-		galEls = append(galEls, params.GaloisElement(i*256))
-	}
-	for i := 1; i < 11; i++ {
-		galEls = append(galEls, params.GaloisElement(i*12*256))
-	}
-
-	for i := 512; i < 512*64; i = i * 2 {
-		galEls = append(galEls, params.GaloisElement(i))
-	}
-	for i := 1; i < 64; i++ {
-		galEls = append(galEls, params.GaloisElement(i*512))
-	}
-
-	for i := 1; i < 8; i++ {
-		galEls = append(galEls, params.GaloisElement(i*512))
-	}
-	for i := 1; i < 8; i++ {
-		galEls = append(galEls, params.GaloisElement(i*8*512))
+	for el := range galElsSet {
+		galEls = append(galEls, el)
 	}
 
 	evk := rlwe.NewMemEvaluationKeySet(kgen.GenRelinearizationKeyNew(sk), kgen.GenGaloisKeysNew(galEls, sk)...)
@@ -117,9 +150,148 @@ func (ckksTool *CKKSTool) MatrixMultiplyPCMMDiagonalBSGS(m int, ctx *rlwe.Cipher
 	n2 := int(math.Ceil(math.Sqrt(float64(n))))    // Baby steps
 	n1 := int(math.Ceil(float64(n) / float64(n2))) // Giant steps
 
+	if numWorkers <= 0 {
+		numWorkers = runtime.NumCPU()
+	}
+
+	X_baby := make([]*rlwe.Ciphertext, n2)
+	X_baby[0] = ctx
+	if n2 > 1 {
+		rotations := make([]int, n2-1)
+		for j := 1; j < n2; j++ {
+			rotations[j-1] = j * m
+		}
+		rotated, err := ckksTool.Eval.RotateHoistedNew(ctx, rotations)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for j := 1; j < n2; j++ {
+			X_baby[j] = rotated[j*m]
+		}
+	}
+
+	if numWorkers > n1 {
+		numWorkers = n1
+	}
+
+	jobs := make(chan int)
+	results := make(chan *rlwe.Ciphertext, numWorkers)
+	var wg sync.WaitGroup
+
+	for workerID := 0; workerID < numWorkers; workerID++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			localEval := ckks.NewEvaluator(ckksTool.Params, ckksTool.Evk)
+			localEncoder := ckks.NewEncoder(ckksTool.Params)
+			shiftedVector := make([]float64, slots)
+			diagonalPt := ckks.NewPlaintext(ckksTool.Params, ctx.Level())
+
+			encodeDiagonal := func(k int) *rlwe.Plaintext {
+				giant := k / n2
+				shift := (-giant * n2 * m) % slots
+				if shift < 0 {
+					shift += slots
+				}
+
+				for idx := range shiftedVector {
+					shiftedVector[idx] = 0
+				}
+				for jMat := 0; jMat < n; jMat++ {
+					rowW := (jMat + k) % n
+					base := jMat * m
+					value := w[rowW][jMat]
+					for rowX := 0; rowX < m; rowX++ {
+						slotIdx := base + rowX
+						dstIdx := slotIdx - shift
+						if dstIdx < 0 {
+							dstIdx += slots
+						}
+						shiftedVector[dstIdx] = value
+					}
+				}
+
+				localEncoder.Encode(shiftedVector, diagonalPt)
+				return diagonalPt
+			}
+
+			for i := range jobs {
+				var innerSum *rlwe.Ciphertext
+				first := true
+
+				// sum( X_baby[j] * W_shifted[i*n2 + j] )
+				for j := 0; j < n2; j++ {
+					k := i*n2 + j
+					if k >= n {
+						break
+					}
+					wDiagonal := encodeDiagonal(k)
+
+					if first {
+						innerSum = ckks.NewCiphertext(ckksTool.Params, X_baby[j].Degree(), X_baby[j].Level())
+						innerSum.Scale = X_baby[j].Scale.Mul(wDiagonal.Scale)
+						first = false
+					}
+					if err := localEval.MulThenAdd(X_baby[j], wDiagonal, innerSum); err != nil {
+						log.Fatal(err)
+					}
+				}
+
+				if innerSum != nil {
+					localEval.Rescale(innerSum, innerSum)
+				}
+
+				rotAmount := i * n2 * m
+				if rotAmount > 0 && innerSum != nil {
+					if err := localEval.Rotate(innerSum, rotAmount, innerSum); err != nil {
+						log.Fatalf("bsgs giant rotation failed for step %d: %v", rotAmount, err)
+					}
+				}
+
+				results <- innerSum
+			}
+		}()
+	}
+
+	go func() {
+		for i := 0; i < n1; i++ {
+			jobs <- i
+		}
+		close(jobs)
+		wg.Wait()
+		close(results)
+	}()
+
+	var finalCtg *rlwe.Ciphertext
+	firstAdd := true
+	for result := range results {
+		if result != nil {
+			if firstAdd {
+				finalCtg = result
+				firstAdd = false
+			} else {
+				err := ckksTool.Eval.Add(finalCtg, result, finalCtg)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+		}
+	}
+
+	return finalCtg
+}
+
+// MatrixMultiplyPCMMDiagonalBSGS 使用 BSGS 优化密文 * 明文对角线矩阵乘法，密文*明文，x[m, n], w[n, n]
+func (ckksTool *CKKSTool) MatrixMultiplyPCMMDiagonalBSGS_old(m int, ctx *rlwe.Ciphertext, w [][]float64, numWorkers int) *rlwe.Ciphertext {
+	n := len(w)
+	slots := ckksTool.Params.MaxSlots()
+
+	n2 := int(math.Ceil(math.Sqrt(float64(n))))
+	n1 := int(math.Ceil(float64(n) / float64(n2)))
+
 	WDiagonalsShifted := make([]*rlwe.Plaintext, n)
 	for k := 0; k < n; k++ {
-		i := k / n2
+		i := k / n2 // Giant step 索引
 
 		diagVector := make([]float64, slots)
 		for rowX := 0; rowX < m; rowX++ {
@@ -148,7 +320,11 @@ func (ckksTool *CKKSTool) MatrixMultiplyPCMMDiagonalBSGS(m int, ctx *rlwe.Cipher
 	X_baby := make([]*rlwe.Ciphertext, n2)
 	X_baby[0] = ctx.CopyNew()
 	for j := 1; j < n2; j++ {
-		X_baby[j], _ = ckksTool.Eval.RotateNew(ctx, j*m)
+		var err error
+		X_baby[j], err = ckksTool.Eval.RotateNew(ctx, j*m)
+		if err != nil {
+			log.Fatalf("old bsgs baby rotation failed for step %d: %v", j*m, err)
+		}
 	}
 
 	if numWorkers <= 0 {
@@ -191,7 +367,9 @@ func (ckksTool *CKKSTool) MatrixMultiplyPCMMDiagonalBSGS(m int, ctx *rlwe.Cipher
 
 				rotAmount := i * n2 * m
 				if rotAmount > 0 && innerSum != nil {
-					localEval.Rotate(innerSum, rotAmount, innerSum)
+					if err := localEval.Rotate(innerSum, rotAmount, innerSum); err != nil {
+						log.Fatalf("old bsgs giant rotation failed for step %d: %v", rotAmount, err)
+					}
 				}
 
 				giantStepResults[i] = innerSum
@@ -259,16 +437,18 @@ func (ckksTool *CKKSTool) MatrixMultiplyWithWorkers(m int, ctx *rlwe.Ciphertext,
 
 			localEval := ckks.NewEvaluator(ckksTool.Params, ckksTool.Evk)
 			localEnd := ckks.NewEncoder(ckksTool.Params)
+			w1 := make([]float64, slots)
+			ptW := ckks.NewPlaintext(ckksTool.Params, ctx.Level())
+			var temp *rlwe.Ciphertext
 
 			for k := range jobs {
-				w1 := make([]float64, slots)
+				clear(w1)
 				for i := 0; i < p; i++ {
 					for j := 0; j < m; j++ {
 						w1[i*m+j] = w[k][i]
 					}
 				}
 
-				ptW := ckks.NewPlaintext(ckksTool.Params, ctx.Level())
 				localEnd.Encode(w1, ptW)
 
 				ctM, _ := localEval.MulNew(ctx, ptW)
@@ -276,15 +456,24 @@ func (ckksTool *CKKSTool) MatrixMultiplyWithWorkers(m int, ctx *rlwe.Ciphertext,
 
 				rot := m
 				for rot < m*p {
-					temp := ctM.CopyNew()
-					localEval.Rotate(temp, rot, temp)
+					if temp == nil {
+						temp = ctM.CopyNew()
+					} else {
+						// Lattigo Copy is dst.Copy(src).
+						temp.Copy(ctM)
+					}
+					if err := localEval.Rotate(temp, rot, temp); err != nil {
+						log.Fatalf("fc reduction rotation failed for step %d: %v", rot, err)
+					}
 					localEval.Add(ctM, temp, ctM)
 					rot = rot * 2
 				}
 
 				ctgs[k], _ = localEval.MulNew(ctM, ptM)
 				localEval.Rescale(ctgs[k], ctgs[k])
-				localEval.Rotate(ctgs[k], -k*m, ctgs[k])
+				if err := localEval.Rotate(ctgs[k], -k*m, ctgs[k]); err != nil {
+					log.Fatalf("fc output rotation failed for class %d, step %d: %v", k, -k*m, err)
+				}
 			}
 		}()
 	}
@@ -296,83 +485,9 @@ func (ckksTool *CKKSTool) MatrixMultiplyWithWorkers(m int, ctx *rlwe.Ciphertext,
 
 	wg.Wait()
 
-	ctg := ctgs[0].CopyNew()
+	ctg := ctgs[0]
 	for i := 1; i < n; i++ {
 		ckksTool.Eval.Add(ctg, ctgs[i], ctg)
-	}
-
-	return ctg
-}
-
-// 对角线编码,x[m, n], w[n, n]
-func (ckksTool *CKKSTool) MatrixMultiplyPCMMDiagonal(m int, ctx *rlwe.Ciphertext, w [][]float64, numWorkers int) *rlwe.Ciphertext {
-
-	n := len(w)
-	slots := ckksTool.Params.MaxSlots()
-
-	// 明文矩阵 W 的对角线编码
-	WDiagonals := make([]*rlwe.Plaintext, n)
-	for k := 0; k < n; k++ {
-		diagVector := make([]float64, slots)
-
-		for rowX := 0; rowX < m; rowX++ {
-			for j := 0; j < n; j++ {
-				rowW := (j + k) % n // W 的行索引 rowW = (j + k) mod n
-				slotIdx := (j * m) + rowX
-				diagVector[slotIdx] = w[rowW][j]
-			}
-		}
-
-		pt := ckks.NewPlaintext(ckksTool.Params, ctx.Level())
-		ckksTool.End.Encode(diagVector, pt)
-		WDiagonals[k] = pt
-	}
-
-	if numWorkers <= 0 {
-		numWorkers = runtime.NumCPU()
-	}
-	if numWorkers > n {
-		numWorkers = n
-	}
-
-	ctgs := make([]*rlwe.Ciphertext, n)
-	jobs := make(chan int, n)
-	var wg sync.WaitGroup
-
-	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			localEval := ckks.NewEvaluator(ckksTool.Params, ckksTool.Evk)
-
-			for k := range jobs {
-				var cXRotated *rlwe.Ciphertext
-				if k == 0 {
-					cXRotated = ctx.CopyNew()
-				} else {
-					cXRotated, _ = localEval.RotateNew(ctx, k*m)
-				}
-
-				ctgs[k], _ = localEval.MulNew(cXRotated, WDiagonals[k])
-				localEval.Rescale(ctgs[k], ctgs[k])
-			}
-		}()
-	}
-
-	for k := 0; k < n; k++ {
-		jobs <- k
-	}
-	close(jobs)
-	wg.Wait()
-
-	ctg := ctgs[0].CopyNew()
-
-	for i := 1; i < n; i++ {
-		err := ckksTool.Eval.Add(ctg, ctgs[i], ctg)
-		if err != nil {
-			log.Fatal(err)
-		}
 	}
 
 	return ctg
@@ -387,6 +502,7 @@ func (ckksTool *CKKSTool) OptimizedFit(op *rlwe.Ciphertext, coeffs []float64, in
 	if err != nil {
 		fmt.Println("poly error: ", err)
 	}
+
 	return res
 }
 
@@ -409,29 +525,40 @@ func (ckksTool *CKKSTool) ArrayToPt(x []float64, level int) *rlwe.Plaintext {
 // 求mean
 func (ckksTool *CKKSTool) Mean(m int, n int, ctx *rlwe.Ciphertext) *rlwe.Ciphertext {
 	slots := ckksTool.Params.MaxSlots()
-	res := ctx.CopyNew()
-	for i := m * (n / 2); i >= m; i = i / 2 {
-		temp := res.CopyNew()
-		ckksTool.Eval.Rotate(temp, i, temp)
-		ckksTool.Eval.Add(res, temp, res)
-	}
-
 	mask := make([]float64, slots)
 	for i := 0; i < slots; i++ {
 		if i < m {
 			mask[i] = 1.0 / float64(n)
-		} else {
-			mask[i] = 0
 		}
 	}
+	return ckksTool.MeanWithMask(m, n, ctx, mask)
+}
+
+func (ckksTool *CKKSTool) MeanWithMask(m int, n int, ctx *rlwe.Ciphertext, mask []float64) *rlwe.Ciphertext {
+	res := ctx.CopyNew()
+	return ckksTool.MeanWithMaskInPlace(m, n, res, mask)
+}
+
+func (ckksTool *CKKSTool) MeanWithMaskInPlace(m int, n int, res *rlwe.Ciphertext, mask []float64) *rlwe.Ciphertext {
+	temp := res.CopyNew()
+	for i := m * (n / 2); i >= m; i = i / 2 {
+		temp.Copy(res)
+		if err := ckksTool.Eval.Rotate(temp, i, temp); err != nil {
+			log.Fatalf("mean positive rotation failed for step %d: %v", i, err)
+		}
+		ckksTool.Eval.Add(res, temp, res)
+	}
+
 	ptM := ckks.NewPlaintext(ckksTool.Params, res.Level())
 	ckksTool.End.Encode(mask, ptM)
 	ckksTool.Eval.Mul(res, ptM, res)
 	ckksTool.Eval.Rescale(res, res)
 
 	for i := m; i <= m*(n/2); i = i * 2 {
-		temp := res.CopyNew()
-		ckksTool.Eval.Rotate(temp, -i, temp)
+		temp.Copy(res)
+		if err := ckksTool.Eval.Rotate(temp, -i, temp); err != nil {
+			log.Fatalf("mean negative rotation failed for step %d: %v", -i, err)
+		}
 		ckksTool.Eval.Add(res, temp, res)
 	}
 
@@ -440,13 +567,24 @@ func (ckksTool *CKKSTool) Mean(m int, n int, ctx *rlwe.Ciphertext) *rlwe.Ciphert
 
 // 求均方值 (Mean Square)
 func (ckksTool *CKKSTool) MeanSquare(m int, n int, ctx *rlwe.Ciphertext) *rlwe.Ciphertext {
+	slots := ckksTool.Params.MaxSlots()
+	mask := make([]float64, slots)
+	for i := 0; i < slots; i++ {
+		if i < m {
+			mask[i] = 1.0 / float64(n)
+		}
+	}
+	return ckksTool.MeanSquareWithMask(m, n, ctx, mask)
+}
+
+func (ckksTool *CKKSTool) MeanSquareWithMask(m int, n int, ctx *rlwe.Ciphertext, mask []float64) *rlwe.Ciphertext {
 	squaredCtx, err := ckksTool.Eval.MulRelinNew(ctx, ctx)
 	ckksTool.Eval.Rescale(squaredCtx, squaredCtx)
 	if err != nil {
 		fmt.Println("MeanSquare error:", err)
 		return nil
 	}
-	return ckksTool.Mean(m, n, squaredCtx)
+	return ckksTool.MeanWithMaskInPlace(m, n, squaredCtx, mask)
 }
 
 // 求var
@@ -492,9 +630,47 @@ func (ckksTool *CKKSTool) DecToFloat64(ctx *rlwe.Ciphertext) {
 	res := make([]float64, ckksTool.Params.MaxSlots())
 	ptx := ckksTool.Dec.DecryptNew(ctx)
 	ckksTool.End.Decode(ptx, res)
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		fmt.Print(res[i], " ")
-		fmt.Print(res[32763+i], " ")
 	}
 	fmt.Println()
+}
+
+func (ckksTool *CKKSTool) LogCiphertextInfo(ct *rlwe.Ciphertext, name string, t int) {
+	if ct == nil {
+		fmt.Printf("[seqlen%d] %s: ct is null\n", t, name)
+		return
+	}
+
+	pt := ckksTool.Dec.DecryptNew(ct)
+	res := make([]float64, ckksTool.Params.MaxSlots())
+	ckksTool.End.Decode(pt, res)
+
+	var sum, max, min float64
+	var nanCount, infCount int
+	min = res[0]
+	max = res[0]
+
+	for i := 0; i < len(res); i++ {
+		val := res[i]
+		if math.IsNaN(val) {
+			nanCount++
+		} else if math.IsInf(val, 0) {
+			infCount++
+		} else {
+			sum += val
+			if val > max {
+				max = val
+			}
+			if val < min {
+				min = val
+			}
+		}
+	}
+
+	fmt.Printf("[seqlen %d] %s - static: Sum=%.6f, Max=%.6f, Min=%.6f, NaN=%d, Inf=%d\n",
+		t, name, sum, max, min, nanCount, infCount)
+
+	fmt.Printf("[seqlen %d] %s - five: [%.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f]\n",
+		t, name, res[0], res[1], res[2], res[3], res[4], res[32763], res[32764], res[32765], res[32766], res[32767])
 }
