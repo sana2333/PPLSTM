@@ -1,7 +1,7 @@
 8 thread
-rms_128_15 one seqlen 62.85     MaxAllocated Memory: 59533.38 MB
+rms_128_15 one seqlen 62.85    
 
-rms_128 one seqlen 53.41s    MaxAllocated Memory: 42398.03 MB
+rms_128 one seqlen 53.41s    
 agnews_30 elapsed time: 27m13.570510749s
 agnews_50 elapsed time: 45m35.220596649s
 agnews_70 elapsed time: 1h3m56.419256641s
@@ -18,7 +18,7 @@ yelp_100 elapsed time: 1h30m22.501429693s
 yelp_150 elapsed time: 2h14m42.571378507s
 yelp_200 elapsed time: 2h59m29.904108229s
 
-rms_64_s one seqlen 45.74s
+rms_64 one seqlen 45.74s
 agnews_30 elapsed time: 23m33.008933237s
 agnews_50 elapsed time: 39m6.972354431s
 agnews_70 elapsed time: 53m32.120342702s
@@ -34,3 +34,40 @@ imdb_200 elapsed time: 2h33m17.695517816s
 yelp_100 elapsed time: 1h17m30.432091219s
 yelp_150 elapsed time: 1h55m2.902070037s
 yelp_200 elapsed time: 2h34m1.040822317s
+
+//cpu Intel 12900K + 32GB RAM
+agnews_s_30 elapsed time: 14m36.5745798s
+accuracy: 91.60% 
+
+dbpedia_s_30 elapsed time: 15m59.8388552s
+accuracy: 99.41% 
+
+agnews_s_50 elapsed time: 26m11.6906546s
+accuracy: 94.92% 
+
+dbpedia_s_50 elapsed time: 26m5.3008346s
+accuracy: 98.05% 
+
+agnews_s_70 elapsed time: 37m12.784763s
+accuracy: 91.41% 
+
+dbpedia_s_70 elapsed time: 36m4.8179587s
+accuracy: 97.27% 
+
+yelp_s_100 elapsed time: 50m8.6039153s
+accuracy: 95.31% 
+
+imdb_s_100 elapsed time: 50m31.2728439s
+accuracy: 87.11% 
+
+yelp_s_150 elapsed time: 1h19m23.4329309s
+accuracy: 95.31% 
+
+imdb_s_150 elapsed time: 1h19m1.7344305s
+accuracy: 88.09% 
+
+yelp_s_200 elapsed time: 1h45m51.4397708s
+accuracy: 94.14% 
+
+imdb_s_200 elapsed time: 1h39m1.0780469s
+accuracy: 85.74% 
