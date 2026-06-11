@@ -173,6 +173,66 @@ func GetEmbeddings(dataFile string, batchID int) [][][]float64 {
 	return embeddings
 }
 
+type EmbeddingInput struct {
+	PaddedBatch     [][]int
+	EmbeddingWeight [][]float64
+}
+
+func GetEmbeddingInput(dataFile string, batchID int) *EmbeddingInput {
+	dataDir := "./data"
+	paramsDir := "./params"
+
+	paddedFile := filepath.Join(dataDir, dataFile, fmt.Sprintf("padded_batch_%d.npy", batchID))
+	embeddingFile := filepath.Join(paramsDir, dataFile, "embedding/weight.npy")
+
+	paddedBatch, err := loadNpyIntMatrix(paddedFile)
+	if err != nil {
+		log.Fatal("load padded_batch:", err)
+	}
+
+	embeddingWeight, err := loadNpyFloatMatrix(embeddingFile)
+	if err != nil {
+		panic(err)
+	}
+
+	return &EmbeddingInput{
+		PaddedBatch:     paddedBatch,
+		EmbeddingWeight: embeddingWeight,
+	}
+}
+
+func (input *EmbeddingInput) BatchSize() int {
+	return len(input.PaddedBatch)
+}
+
+func (input *EmbeddingInput) SeqLen() int {
+	return len(input.PaddedBatch[0])
+}
+
+func (input *EmbeddingInput) EmbeddingDim() int {
+	return len(input.EmbeddingWeight[0])
+}
+
+func (input *EmbeddingInput) FillTimeStepSlots(t int, hiddenDim int, dst []float64) {
+	clear(dst)
+
+	batchSize := input.BatchSize()
+	for row := 0; row < batchSize; row++ {
+		tokenID := input.PaddedBatch[row][t]
+		if tokenID < 0 || tokenID >= len(input.EmbeddingWeight) {
+			panic(fmt.Sprintf("token index %d out of range", tokenID))
+		}
+		embedding := input.EmbeddingWeight[tokenID]
+		cols := len(embedding)
+		if cols > hiddenDim {
+			cols = hiddenDim
+		}
+		for col := 0; col < cols; col++ {
+			dst[col*batchSize+row] = embedding[col]
+		}
+	}
+}
+
 func GetLabels(dataFile string, batchID int) []int {
 	dataDir := "./data"
 
