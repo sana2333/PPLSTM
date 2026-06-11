@@ -1,4 +1,5 @@
 8 thread
+//CPU Intel Xeon(R) Gold 6530 CPU (2.1GHz) + 128 GB RAM
 rms_128_15 one seqlen 62.85    
 
 rms_128 one seqlen 53.41s    
@@ -35,7 +36,7 @@ yelp_100 elapsed time: 1h17m30.432091219s
 yelp_150 elapsed time: 1h55m2.902070037s
 yelp_200 elapsed time: 2h34m1.040822317s
 
-//cpu Intel 12900K + 32GB RAM
+//CPU Intel 12900K (3.2GHz) + 32GB RAM
 agnews_s_30 elapsed time: 14m36.5745798s
 accuracy: 91.60% 
 
